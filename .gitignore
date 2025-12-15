@@ -1,0 +1,22 @@
+# Системные файлы Windows
+desktop.ini
+Thumbs.db
+.DS_Store
+
+# Файлы компиляции Java
+*.class
+*.jar
+
+# Файлы IDE
+.idea/
+*.iml
+.vscode/
+
+# Скомпилированные папки
+bin/
+out/
+target/
+
+# Отчеты в различных форматах (если нужно)
+*.docx
+*.doc

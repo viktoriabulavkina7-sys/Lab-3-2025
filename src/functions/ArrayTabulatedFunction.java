@@ -3,6 +3,7 @@ package functions;
 public class ArrayTabulatedFunction implements TabulatedFunctionImp {
     private int pointsCount;
     private FunctionPoint[] points;
+    private static final double EPSILON = 1e-10; // Машинный эпсилон для сравнения double
 
     public ArrayTabulatedFunction(double leftX, double rightX, int pointsCount) {
         if (leftX >= rightX) {
@@ -20,6 +21,7 @@ public class ArrayTabulatedFunction implements TabulatedFunctionImp {
             points[i] = new FunctionPoint(x, 0.0);
         }
     }
+
     public ArrayTabulatedFunction(double leftX, double rightX, double[] values) {
         if (leftX >= rightX) {
             throw new IllegalArgumentException("Левая граница должна быть меньше правой границы: " + leftX + " >= " + rightX);
@@ -36,6 +38,7 @@ public class ArrayTabulatedFunction implements TabulatedFunctionImp {
             points[i] = new FunctionPoint(x, values[i]);
         }
     }
+
     public ArrayTabulatedFunction(FunctionPoint[] points) {
         if (points.length < 2) {
             throw new IllegalArgumentException("Требуется как минимум 2 точки");
@@ -52,29 +55,51 @@ public class ArrayTabulatedFunction implements TabulatedFunctionImp {
     public double getLeftDomainBorder() {
         return points[0].getX();
     }
+
     @Override
     public double getRightDomainBorder() {
         return points[pointsCount - 1].getX();
     }
+
     @Override
     public double getFunctionValue(double x) {
-        if (x < getLeftDomainBorder() || x > getRightDomainBorder())
+        // Проверяем границы с учетом машинного эпсилона
+        if (x < getLeftDomainBorder() - EPSILON || x > getRightDomainBorder() + EPSILON)
             return Double.NaN;
+
+        // Если x совпадает с одной из точек, возвращаем её y
+        for (int i = 0; i < pointsCount; i++) {
+            if (Math.abs(points[i].getX() - x) < EPSILON) {
+                return points[i].getY();
+            }
+        }
+
+        // Линейная интерполяция
         for (int i = 0; i < pointsCount - 1; i++) {
             double x1 = points[i].getX();
             double x2 = points[i + 1].getX();
-            if (x >= x1 && x <= x2) {
+
+            if (x >= x1 - EPSILON && x <= x2 + EPSILON) {
                 double y1 = points[i].getY();
                 double y2 = points[i + 1].getY();
+
+                // Если точки почти совпадают по x
+                if (Math.abs(x2 - x1) < EPSILON) {
+                    return y1;
+                }
+
                 return y1 + ((y2 - y1) * (x - x1)) / (x2 - x1);
             }
         }
+
         return Double.NaN;
     }
+
     @Override
     public int getPointsCount() {
         return pointsCount;
     }
+
     @Override
     public FunctionPoint getPoint(int index) {
         if (index < 0 || index >= pointsCount) {
@@ -82,21 +107,23 @@ public class ArrayTabulatedFunction implements TabulatedFunctionImp {
         }
         return new FunctionPoint(points[index]);
     }
+
     @Override
     public void setPoint(int index, FunctionPoint point) throws InappropriateFunctionPointException {
         if (index < 0 || index >= pointsCount) {
             throw new FunctionPointIndexOutOfBoundsException("Индекс: " + index + ", Количество: " + pointsCount);
         }
 
-        if (index > 0 && point.getX() <= points[index - 1].getX()) {
+        if (index > 0 && point.getX() <= points[index - 1].getX() - EPSILON) {
             throw new InappropriateFunctionPointException("Точка x=" + point.getX() + " должно быть больше предыдущей точки x=" + points[index - 1].getX());
         }
-        if (index < pointsCount - 1 && point.getX() >= points[index + 1].getX()) {
+        if (index < pointsCount - 1 && point.getX() >= points[index + 1].getX() + EPSILON) {
             throw new InappropriateFunctionPointException("Точка x=" + point.getX() + " должно быть меньше следующей точки x=" + points[index + 1].getX());
         }
 
         points[index] = new FunctionPoint(point);
     }
+
     @Override
     public double getPointX(int index) {
         if (index < 0 || index >= pointsCount) {
@@ -104,28 +131,31 @@ public class ArrayTabulatedFunction implements TabulatedFunctionImp {
         }
         return points[index].getX();
     }
+
     @Override
     public void setPointX(int index, double x) throws InappropriateFunctionPointException {
         if (index < 0 || index >= pointsCount) {
             throw new FunctionPointIndexOutOfBoundsException("Индекс: " + index + ", Количество: " + pointsCount);
         }
 
-        if (index > 0 && x <= points[index - 1].getX()) {
+        if (index > 0 && x <= points[index - 1].getX() - EPSILON) {
             throw new InappropriateFunctionPointException("Точка x= " + x + " должно быть больше предыдущей точки x= " + points[index - 1].getX());
         }
-        if (index < pointsCount - 1 && x >= points[index + 1].getX()) {
+        if (index < pointsCount - 1 && x >= points[index + 1].getX() + EPSILON) {
             throw new InappropriateFunctionPointException("Точка x= " + x + " должно быть меньше следующей точки x= " + points[index + 1].getX());
         }
 
         points[index].setX(x);
     }
+
     @Override
     public double getPointY(int index) {
         if (index < 0 || index >= pointsCount) {
-            throw new FunctionPointIndexOutOfBoundsException("Индекс: " + index + ", Количество: " + pointsCount);
+            throw new FunctionPointIndexOutOfBoundsException("Индекс: " + index + ", Количеств: " + pointsCount);
         }
         return points[index].getY();
     }
+
     @Override
     public void setPointY(int index, double y) {
         if (index < 0 || index >= pointsCount) {
@@ -133,6 +163,7 @@ public class ArrayTabulatedFunction implements TabulatedFunctionImp {
         }
         points[index].setY(y);
     }
+
     @Override
     public void deletePoint(int index) {
         if (index < 0 || index >= pointsCount) {
@@ -144,16 +175,18 @@ public class ArrayTabulatedFunction implements TabulatedFunctionImp {
         }
 
         System.arraycopy(points, index + 1, points, index, pointsCount - index - 1);
+        points[pointsCount - 1] = null; // Очищаем последнюю ячейку
         pointsCount--;
     }
+
     @Override
     public void addPoint(FunctionPoint point) throws InappropriateFunctionPointException {
         int insertIndex = 0;
-        while (insertIndex < pointsCount && points[insertIndex].getX() < point.getX()) {
+        while (insertIndex < pointsCount && points[insertIndex].getX() < point.getX() - EPSILON) {
             insertIndex++;
         }
 
-        if (insertIndex < pointsCount && Math.abs(points[insertIndex].getX() - point.getX()) < Double.MIN_VALUE) {
+        if (insertIndex < pointsCount && Math.abs(points[insertIndex].getX() - point.getX()) < EPSILON) {
             throw new InappropriateFunctionPointException("Точка с х= " + point.getX() + " уже существует по индексу " + insertIndex);
         }
 

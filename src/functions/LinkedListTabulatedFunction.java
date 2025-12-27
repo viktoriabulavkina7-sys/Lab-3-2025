@@ -38,6 +38,7 @@ public class LinkedListTabulatedFunction implements TabulatedFunctionImp {
     private int size; // Количество значащих элементов
     private FunctionNode lastAccessedNode; // Для оптимизации доступа
     private int lastAccessedIndex; // Индекс последнего доступного узла
+    private static final double EPSILON = 1e-10; // Машинный эпсилон
 
     // Инициализация пустого списка с головой
     private void initializeList() {
@@ -48,11 +49,13 @@ public class LinkedListTabulatedFunction implements TabulatedFunctionImp {
         lastAccessedNode = head;
         lastAccessedIndex = -1;
     }
+
     // Метод для получения узла по индексу с оптимизацией
     private FunctionNode getNodeByIndex(int index) {
         if (index < 0 || index >= size) {
             throw new FunctionPointIndexOutOfBoundsException("Индекс выходит за пределы: " + index);
         }
+
         // Оптимизация: начинаем поиск с последнего доступного узла
         FunctionNode current;
         int startIndex;
@@ -60,55 +63,55 @@ public class LinkedListTabulatedFunction implements TabulatedFunctionImp {
             // Ближе к последнему доступному узлу
             current = lastAccessedNode;
             startIndex = lastAccessedIndex;
-        }
-        else if (index < size / 2) {
+        } else if (index < size / 2) {
             // Ближе к началу
             current = head.getNext();
             startIndex = 0;
-        }
-        else {
+        } else {
             // Ближе к концу
             current = head.getPrev();
             startIndex = size - 1;
         }
+
         // Поиск нужного узла
         if (index > startIndex) {
             for (int i = startIndex; i < index; i++) {
                 current = current.getNext();
             }
-        }
-        else if (index < startIndex) {
+        } else if (index < startIndex) {
             for (int i = startIndex; i > index; i--) {
                 current = current.getPrev();
             }
         }
+
         // Сохраняем для будущей оптимизации
         lastAccessedNode = current;
         lastAccessedIndex = index;
         return current;
     }
+
     // Метод для добавления узла по индексу
     private FunctionNode addNodeByIndex(int index) {
         if (index < 0 || index > size) {
             throw new FunctionPointIndexOutOfBoundsException("Индекс выходит за пределы: " + index);
         }
+
         FunctionNode newNode = new FunctionNode(new FunctionPoint(0, 0));
+
         if (size == 0) {
             // Первый элемент
             newNode.setNext(head);
             newNode.setPrev(head);
             head.setNext(newNode);
             head.setPrev(newNode);
-        }
-        else if (index == size) {
+        } else if (index == size) {
             // Вставка в конец
             FunctionNode last = head.getPrev();
             last.setNext(newNode);
             newNode.setPrev(last);
             newNode.setNext(head);
             head.setPrev(newNode);
-        }
-        else {
+        } else {
             // Вставка в середину
             FunctionNode current = getNodeByIndex(index);
             FunctionNode prevNode = current.getPrev();
@@ -117,31 +120,39 @@ public class LinkedListTabulatedFunction implements TabulatedFunctionImp {
             newNode.setNext(current);
             current.setPrev(newNode);
         }
+
         size++;
         lastAccessedIndex = -1; // Сбрасываем кэш
         return newNode;
     }
+
     // Метод для добавления узла в конец списка
     private FunctionNode addNodeToTail() {
         return addNodeByIndex(size);
     }
+
     // Метод для удаления узла по индексу
     private FunctionNode deleteNodeByIndex(int index) {
         if (index < 0 || index >= size) {
-            throw new FunctionPointIndexOutOfBoundsException("IИндекс выходит за пределы: " + index);
+            throw new FunctionPointIndexOutOfBoundsException("Индекс выходит за пределы: " + index);
         }
+
         if (size < 3) {
             throw new IllegalStateException("Невозможно удалить точку — требуется минимум 2 точки");
         }
+
         FunctionNode nodeToDelete = getNodeByIndex(index);
         FunctionNode prevNode = nodeToDelete.getPrev();
         FunctionNode nextNode = nodeToDelete.getNext();
+
         prevNode.setNext(nextNode);
         nextNode.setPrev(prevNode);
+
         size--;
         lastAccessedIndex = -1; // Сбрасываем кэш
         return nodeToDelete;
     }
+
     // Конструкторы
     public LinkedListTabulatedFunction(double[] xValues, double[] yValues) {
         if (xValues.length != yValues.length) {
@@ -156,6 +167,7 @@ public class LinkedListTabulatedFunction implements TabulatedFunctionImp {
             addNodeToTail().setPoint(new FunctionPoint(xValues[i], yValues[i]));
         }
     }
+
     public LinkedListTabulatedFunction(FunctionPoint[] points) {
         if (points.length < 2) {
             throw new IllegalArgumentException("Требуется как минимум 2 точки");
@@ -175,6 +187,7 @@ public class LinkedListTabulatedFunction implements TabulatedFunctionImp {
         }
         return head.getNext().getPoint().getX();
     }
+
     @Override
     public double getRightDomainBorder() {
         if (size == 0) {
@@ -182,10 +195,20 @@ public class LinkedListTabulatedFunction implements TabulatedFunctionImp {
         }
         return head.getPrev().getPoint().getX();
     }
+
     @Override
     public double getFunctionValue(double x) {
-        if (x < getLeftDomainBorder() || x > getRightDomainBorder()) {
+        // Проверяем границы с учетом эпсилона
+        if (x < getLeftDomainBorder() - EPSILON || x > getRightDomainBorder() + EPSILON) {
             return Double.NaN;
+        }
+
+        // Поиск точки с точно таким же X
+        for (int i = 0; i < size; i++) {
+            FunctionNode node = getNodeByIndex(i);
+            if (Math.abs(node.getPoint().getX() - x) < EPSILON) {
+                return node.getPoint().getY();
+            }
         }
 
         // Поиск интервала для интерполяции
@@ -198,8 +221,8 @@ public class LinkedListTabulatedFunction implements TabulatedFunctionImp {
             double y1 = current.getPoint().getY();
             double y2 = next.getPoint().getY();
 
-            if (x >= x1 && x <= x2) {
-                if (x1 == x2) {
+            if (x >= x1 - EPSILON && x <= x2 + EPSILON) {
+                if (Math.abs(x2 - x1) < EPSILON) {
                     return y1; // Вертикальный отрезок
                 }
                 // Линейная интерполяция
@@ -209,69 +232,79 @@ public class LinkedListTabulatedFunction implements TabulatedFunctionImp {
 
         return Double.NaN;
     }
+
     @Override
     public int getPointsCount() {
         return size;
     }
+
     @Override
     public FunctionPoint getPoint(int index) {
         FunctionNode node = getNodeByIndex(index);
-        return new FunctionPoint(node.getPoint().getX(), node.getPoint().getY());
+        return new FunctionPoint(node.getPoint());
     }
+
     @Override
     public void setPoint(int index, FunctionPoint point) throws InappropriateFunctionPointException {
         if (index < 0 || index >= size) {
             throw new FunctionPointIndexOutOfBoundsException("Индекс выходит за пределы: " + index);
         }
-        // Проверка порядка X
-        if (index > 0 && point.getX() <= getPoint(index - 1).getX()) {
+
+        // Проверка порядка X с учетом эпсилона
+        if (index > 0 && point.getX() <= getPoint(index - 1).getX() - EPSILON) {
             throw new InappropriateFunctionPointException("X должен строго возрастать");
         }
-        if (index < size - 1 && point.getX() >= getPoint(index + 1).getX()) {
+        if (index < size - 1 && point.getX() >= getPoint(index + 1).getX() + EPSILON) {
             throw new InappropriateFunctionPointException("X должен строго возрастать");
         }
 
         FunctionNode node = getNodeByIndex(index);
-        node.setPoint(new FunctionPoint(point.getX(), point.getY()));
+        node.setPoint(new FunctionPoint(point));
     }
+
     @Override
     public double getPointX(int index) {
         return getPoint(index).getX();
     }
+
     @Override
     public void setPointX(int index, double x) throws InappropriateFunctionPointException {
         FunctionPoint point = getPoint(index);
         setPoint(index, new FunctionPoint(x, point.getY()));
     }
+
     @Override
     public double getPointY(int index) {
         return getPoint(index).getY();
     }
+
     @Override
-    public void setPointY(int index, double y)  {
+    public void setPointY(int index, double y) {
         FunctionNode node = getNodeByIndex(index);
-        FunctionPoint newPoint = new FunctionPoint(node.getPoint().getX(), y);
-        node.setPoint(newPoint);
+        node.setPoint(new FunctionPoint(node.getPoint().getX(), y));
     }
+
     @Override
     public void deletePoint(int index) {
         deleteNodeByIndex(index);
     }
+
     @Override
     public void addPoint(FunctionPoint point) throws InappropriateFunctionPointException {
         // Находим позицию для вставки
         int insertIndex = size;
         for (int i = 0; i < size; i++) {
             double currentX = getPointX(i);
-            if (currentX == point.getX()) {
+            if (Math.abs(currentX - point.getX()) < EPSILON) {
                 throw new InappropriateFunctionPointException("Точка с X=" + point.getX() + " уже существует");
             }
-            if (currentX > point.getX()) {
+            if (currentX > point.getX() + EPSILON) {
                 insertIndex = i;
                 break;
             }
         }
+
         FunctionNode newNode = addNodeByIndex(insertIndex);
-        newNode.setPoint(point);
+        newNode.setPoint(new FunctionPoint(point));
     }
 }
